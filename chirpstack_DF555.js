@@ -1,4 +1,4 @@
-// Version 1.2, Date:20220817
+// Version 1.3, Date:20221119
 // Decode an uplink message from a buffer
 // payload - array of bytes
 // metadata - key/value object
@@ -62,11 +62,10 @@ function Parse_Code_DF555(payload_in, metadata_in) {
     //var deviceType = "default";
     if (payload_in.data == null) return NaN;
     var incomingHexData = base64ToHex(payload_in.data);
-
     if (
         (incomingHexData.length != 34 && incomingHexData
             .length != 50) ||
-        incomingHexData.substring(0, 6) != "800005" ||
+        incomingHexData.substring(0, 4) != "8000" ||
         incomingHexData.substring(
             incomingHexData.length - 2,
             incomingHexData.length
@@ -77,7 +76,9 @@ function Parse_Code_DF555(payload_in, metadata_in) {
 
     if (
         incomingHexData.length == 34 &&
-        incomingHexData.substring(8, 10) == "11"
+        incomingHexData.substring(8, 10) == "11" &&
+        incomingHexData.substring(6, 8) != "03"
+
     ) {
         var result = {
             deviceName: deviceName,
@@ -107,21 +108,81 @@ function Parse_Code_DF555(payload_in, metadata_in) {
                 temperature: parseInt(incomingHexData
                     .substring(16, 18), 16),
                 alarmLevel: parseInt(incomingHexData
-                        .substring(22, 23), 16) == 1 ?
+                    .substring(22, 23), 16) == 1 ?
                     true : false,
                 alarmBattery: parseInt(incomingHexData
-                        .substring(25, 26), 16) == 1 ?
+                    .substring(25, 26), 16) == 1 ?
                     true : false,
-                volt: parseInt(incomingHexData
-                    .substring(26, 30), 16) / 100,
                 frameCounter: parseInt(incomingHexData
-                    .substring(30, 34), 16),
+                    .substring(26, 30), 16),
             },
         };
         return result;
     } else if (
         incomingHexData.length == 50 &&
         incomingHexData.substring(8, 10) == "19" &&
+        incomingHexData.substring(6, 8) != "03"
+
+    ) {
+        var out_h = parseInt(incomingHexData.substring(10,
+            14), 16);
+        var out_lng = parseFloat(str2IEEE754(incomingHexData
+            .substring(16, 24)).toFixed(6));
+        var out_lat = parseFloat(str2IEEE754(incomingHexData
+            .substring(24, 32)).toFixed(6));
+        var out_t = parseInt(incomingHexData.substring(32,
+            34), 16);
+        var out_a = parseInt(incomingHexData.substring(36,
+            38), 16);
+        var out_full_al = parseInt(incomingHexData
+            .substring(38, 39), 16);
+        var out_fire_al = parseInt(incomingHexData
+            .substring(39, 40), 16);
+        var out_fall_al = parseInt(incomingHexData
+            .substring(40, 41), 16);
+        var out_battery_al = parseInt(incomingHexData
+            .substring(41, 42), 16);
+        var out_frame_counter = parseInt(incomingHexData
+            .substring(42, 46), 16);
+        var result = {
+            deviceName: deviceName,
+            deviceType: deviceType,
+            deviceLabel: deviceLabel,
+            customerName: customerName,
+            attributes: {
+                devAddr: payload_in.devAddr,
+                devEui: payload_in.deviceInfo.devEui,
+                rssi: payload_in.rxInfo[0].rssi,
+                snr: payload_in.rxInfo[0].snr,
+                gatewayId: payload_in.rxInfo[0]
+                    .gatewayId.toUpperCase(),
+                gatewayLong: payload_in.rxInfo[0]
+                    .location.longitude,
+                gatewayLat: payload_in.rxInfo[0]
+                    .location.latitude,
+                band: payload_in.rxInfo[0].metadata
+                    .region_name.toUpperCase(),
+                wireless: "LoRaWAN",
+            },
+            telemetry: {
+                level: out_h,
+                temperature: out_t,
+                angle: out_a,
+                alarmLevel: out_full_al,
+                alarmBattery: out_battery_al,
+                alarmFire: out_fire_al,
+                alarmFall: out_fall_al,
+                longitude: out_lng,
+                latitude: out_lat,
+                frameCounter: out_frame_counter,
+            },
+        };
+
+        return result;
+
+    } else if (
+        incomingHexData.length == 34 &&
+        incomingHexData.substring(8, 10) == "11" &&
         incomingHexData.substring(6, 8) == "03"
     ) {
         var result = {
@@ -144,7 +205,7 @@ function Parse_Code_DF555(payload_in, metadata_in) {
                     .region_name.toUpperCase(),
                 wireless: "LoRaWAN",
                 firmware: parseInt(incomingHexData
-                        .substring(10, 12), 16) + "." +
+                    .substring(10, 12), 16) + "." +
                     parseInt(incomingHexData.substring(
                         12, 14), 16),
                 uploadInterval: parseInt(incomingHexData
